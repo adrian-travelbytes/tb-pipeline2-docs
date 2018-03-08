@@ -1,0 +1,153 @@
+swagger: "2.0"
+info:
+  version: tb-pipeline-dev-0-001
+  title: "TB Pipeline 2 API"
+  description: User API spec for the pipeline migration project.
+  contact:
+    name: TravelBytes Team
+    email: info@travelbytes.biz
+    url: http://travelbytes.biz
+host: tb-pipeline-dev.appspot.com
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+
+  # Transform Component
+  /qi/transform/xml:
+    post:
+      tags:
+        - transform
+      summary: Transforms XML using XSLT
+      operationId: xmlTransform
+      produces:
+        - application/json
+        - text/xml
+      parameters:
+        - name: api_key
+          in: query
+          description: API key required for access
+          required: true
+          type: string
+        - name: loginBody
+          in: body
+          required: true
+          schema:
+            type: object
+            required:
+              - xml
+              - gds
+            properties:
+              xml:
+                description: XML to transform
+                type: string
+              gds:
+                description: GDS field to determine transform to apply [1A, 1G, 1S]
+                type: string
+      responses:
+        200:
+          description: Transform successful
+          schema:
+            type: object
+            properties:
+              tbxml:
+                type: string
+        400:
+          description: Missing XML or GDS
+          schema:
+            $ref: "#/definitions/MessageResponse"
+        401:
+          description: Invalid or missing API key
+          schema:
+            $ref: "#/definitions/MessageResponse"
+        404:
+          description: Error in transforming XML
+          schema:
+            $ref: "#/definitions/MessageResponse"
+  /transform/xml/message:
+    post:
+      tags:
+        - transform
+      summary: Subscriber handler for receiving incoming transform request messages
+      description: Might be changed to use the admin /_ah/push-handler prefix if testing with it can be figured out
+      operationId: messageTransformXml
+      parameters:
+        - name: api_key
+          in: query
+          description: API key required for access
+          required: true
+          type: string
+        - name: subscription
+          in: body
+          schema:
+            $ref: '#/definitions/PushMessage'
+      responses:
+        200:
+          description: Transform successful
+          schema:
+            $ref: '#/definitions/EmptyResponse'
+        250:
+          description: Transformation error / Missing xml file
+          schema:
+            $ref: "#/definitions/MessageResponse"
+        400:
+          description: No record for id exists
+          schema:
+            $ref: "#/definitions/MessageResponse"
+
+
+# Object Definitions
+definitions:
+  EmptyResponse:
+    description: No data being returned
+    type: object
+  
+  MessageResponse:
+    type: object
+    required:
+     - code
+     - message
+    properties:
+      code:
+        description: Message code
+        type: string
+      message:
+        description: Message description
+        type: string
+
+  PushMessage:
+    description: Push message sent to a subscriber
+    type: object
+    required:
+      - subscription
+      - message
+    properties:
+      subscripton:
+        description: Full subscription string as on GCP
+        type: string
+      message:
+        $ref: '#/definitions/PushSubMessage'
+            
+  PushSubMessage:
+    description: Message payload published together during a PubSub. Either the data or attributes property must be populated
+    type: object
+    properties:
+      data:
+        description: Data sent in b64 encoded format
+        type: string
+      attributes: 
+        description: Object consisting of key/value pairs, if data is empty, this must be populated
+        type: object
+      messageId:
+        description: Id of the published message, this is autopopulated by the publisher server
+        type: number
+      publishTime:
+        description: Time of published message, this is autopopulated by the publisher server
+        type: string
+        format: date-time
+      force:
+        description: Force reprocessing of xml transformation regardless of status
+        type: boolean
